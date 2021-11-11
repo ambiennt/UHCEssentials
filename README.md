@@ -12,9 +12,11 @@ Essential settings for UHC, PVP maps, minigames, and survival with BDS + EZ 1.16
 -enderPearlCooldownTime - sets the cooldown time for using ender pearls (default: 20 ticks)  
 -sendEnderPearlCooldownMessage - determines whether or not a popup message with the time left in the ender pearl cooldown will display to the pearl thrower  
 -netherScale - sets the scale of the nether (default 8:1)  
+-playersCanChangeSkins - determines whether players can change skins in the current session  
 
 Other features:  
 -skins will always have the "trusted" flag and will no longer show as steve if the client has the "Only Allow Trusted Skins" toggle off in their profile settings  
 -some new commands are now executable by operators in game (/permission, /listd, /agent, /whitelist)  
+-the Setmaxplayers command now bypasses the 30 player limit
 
 TODO: fix hopper performance  
