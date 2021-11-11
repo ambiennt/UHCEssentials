@@ -14,9 +14,12 @@
 #include <Actor/Skin/SerializedSkin.h>
 #include <Command/CommandPermissionLevel.h>
 #include <Command/CommandFlag.h>
+#include <Command/CommandOutput.h>
 #include <Item/ItemStack.h>
 #include <Item/Item.h>
 #include <Packet/TextPacket.h>
+#include <Net/ServerNetworkHandler.h>
+#include <Core/mce.h>
 
 inline struct Settings {
     bool netherPortalIgniting            = true;
@@ -30,6 +33,7 @@ inline struct Settings {
     unsigned int enderPearlCooldownTime  = 20;
     bool sendEnderPearlCooldownMessage   = true;
     unsigned int netherScale             = 8;
+    bool playersCanChangeSkins           = true;
 
     template <typename IO> static inline bool io(IO f, Settings &settings, YAML::Node &node) {
   
@@ -43,7 +47,8 @@ inline struct Settings {
             f(settings.playerCrits, node["playerCrits"]) &&
             f(settings.enderPearlCooldownTime, node["enderPearlCooldownTime"]) &&
             f(settings.sendEnderPearlCooldownMessage, node["sendEnderPearlCooldownMessage"]) &&
-            f(settings.netherScale, node["netherScale"]);
+            f(settings.netherScale, node["netherScale"]) &&
+            f(settings.playersCanChangeSkins, node["playersCanChangeSkins"]);
 	}
 } settings;
 

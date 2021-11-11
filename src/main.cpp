@@ -15,12 +15,10 @@ TClasslessInstanceHook(bool, "?use@EndPortalFrameBlock@@UEBA_NAEAVPlayer@@AEBVBl
   	if (!settings.endPortalActivating) return false; // for some reason it still places if player is in creative
   	return original(this, player, pos);
 }
-
 /*THook(void, "?createPortal@EndPortalFrameBlock@@CAXAEAVBlockSource@@AEBVBlockPos@@@Z", BlockSource *region, const BlockPos *origin) {
     if (settings.endPortalActivating) return; // doesn't seem to do anything
     original(region, origin);
 }
-
 TClasslessInstanceHook(bool, "?isValid@EndPortalShape@@QEAA_NAEAVBlockSource@@@Z", BlockSource* region) {
     if (!settings.endPortalActivating) return false; // doesn't seem to do anything
     return original(this, region);
@@ -89,12 +87,36 @@ THook(int, "?getItemCooldownLeft@Player@@UEBAHW4CooldownType@@@Z", Player* playe
     return ret;
 }
 
+THook(void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVPlayerSkinPacket@@@Z",
+    ServerNetworkHandler &snh, NetworkIdentifier &source, void *pkt) {
+    if (!settings.playersCanChangeSkins) return;
+    original(snh, source, pkt);
+}
+
 //non-configurable essentials / bug vanilla bug fixes go here
 
 THook(void, "?write@SerializedSkin@@QEBAXAEAVBinaryStream@@@Z", SerializedSkin &skin, BinaryStream &stream) {
 	
 	skin.trusted_flag = SerializedSkin::TrustedFlag::YES;
 	original(skin, stream);
+}
+
+THook(void, "?execute@SetMaxPlayersCommand@@UEBAXAEBVCommandOrigin@@AEAVCommandOutput@@@Z",
+    class SetMaxPlayersCommand *cmd, void *origin, CommandOutput &output) {
+
+    auto snh = LocateService<ServerNetworkHandler>();
+    const auto empty = mce::UUID::EMPTY;
+    int64_t activePlayers = CallServerClassMethod<int64_t>(
+        "?_getActiveAndInProgressPlayerCount@ServerNetworkHandler@@AEBAHVUUID@mce@@@Z", snh, &empty);
+    int cmdCount = direct_access<int>(cmd, 0x20);
+    int newCount = std::clamp(cmdCount, (int)activePlayers, INT_MAX);
+    snh->mMaxNumPlayers = newCount;
+    snh->updateServerAnnouncement();
+
+    output.success("commands.setmaxplayers.success", {newCount});
+    if (cmdCount < activePlayers) {
+        output.success("commands.setmaxplayers.success.lowerbound", {newCount});
+    }
 }
 
 TClasslessInstanceHook(void, "?registerCommand@CommandRegistry@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PEBDW4CommandPermissionLevel@@UCommandFlag@@3@Z",
@@ -110,6 +132,7 @@ TClasslessInstanceHook(void, "?registerCommand@CommandRegistry@@QEAAXAEBV?$basic
         //case 0xaa75b:  // stop
         //case 0xa3db0:  // changesetting
         //case 0x453dc3: // querytarget
+        //case 0x4975f9: // setmaxplayers
         case 0x480e45: // permission
         case 0x47ad28: // listd
         case 0x44ac4d: // agent
