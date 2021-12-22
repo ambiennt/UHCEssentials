@@ -18,18 +18,22 @@
 #include <Item/ItemStack.h>
 #include <Item/Item.h>
 #include <Packet/TextPacket.h>
+#include <Packet/AddPlayerPacket.h>
 #include <Net/ServerNetworkHandler.h>
 #include <Core/mce.h>
+#include <Component/AABBShapeComponent.h>
+#include <Component/ProjectileComponent.h>
 
 inline struct Settings {
     bool netherPortalIgniting            = true;
     bool endPortalActivating             = true;
-    bool setBedRespawnPosition           = true;
+    //bool setBedRespawnPosition           = true;
     bool spawnWithersFromBlockPattern    = true;
     bool playerSwimming                  = true;
     bool playerMapMarkers                = true;
     bool lightningDealsDamage            = true;
-    bool playerCrits                     = true;
+    float splashPotionRadius             = 4.0f;
+    bool playersCanCrit                  = true;
     unsigned int enderPearlCooldownTime  = 20;
     bool sendEnderPearlCooldownMessage   = true;
     unsigned int netherScale             = 8;
@@ -39,12 +43,13 @@ inline struct Settings {
   
 	    return f(settings.netherPortalIgniting, node["netherPortalIgniting"]) &&
             f(settings.endPortalActivating, node["endPortalActivating"]) &&
-            f(settings.setBedRespawnPosition, node["setBedRespawnPosition"]) &&
+            //f(settings.setBedRespawnPosition, node["setBedRespawnPosition"]) &&
             f(settings.spawnWithersFromBlockPattern, node["spawnWithersFromBlockPattern"]) &&
             f(settings.playerSwimming, node["playerSwimming"]) &&
             f(settings.playerMapMarkers, node["playerMapMarkers"]) &&
             f(settings.lightningDealsDamage, node["lightningDealsDamage"]) &&
-            f(settings.playerCrits, node["playerCrits"]) &&
+            f(settings.splashPotionRadius, node["splashPotionRadius"]) &&
+            f(settings.playersCanCrit, node["playersCanCrit"]) &&
             f(settings.enderPearlCooldownTime, node["enderPearlCooldownTime"]) &&
             f(settings.sendEnderPearlCooldownMessage, node["sendEnderPearlCooldownMessage"]) &&
             f(settings.netherScale, node["netherScale"]) &&
