@@ -78,6 +78,20 @@ TClasslessInstanceHook(void, "?doOnHitEffect@SplashPotionEffectSubcomponent@@UEA
     original(this, owner, component);
 }
 
+TClasslessInstanceHook(bool, "?isValidFireLocation@FireBlock@@AEBA_NAEAVBlockSource@@AEBVBlockPos@@@Z",
+    BlockSource &region, BlockPos const& pos) {
+    // unlike gamerule dofiretick, turning this setting off will still allow the source block to extinguish its flame
+    if (!settings.fireSpreads) return false;
+    return original(this, region, pos);
+}
+
+THook(void*, "??0ItemActor@@QEAA@PEAVActorDefinitionGroup@@AEBUActorDefinitionIdentifier@@@Z",
+    ItemActor *thi, void* definitionGroup, void* definitionIdentifier) {
+    auto ret = original(thi, definitionGroup, definitionIdentifier);
+    thi->mLifeTime = settings.itemActorDespawnTime;
+    return ret;
+}
+
 THook(bool, "?initialize@Level@@UEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@AEBVLevelSettings@@PEAVLevelData@@PEBV23@@Z",
     Level *level, const std::string *levelName, const LevelSettings *levelSettings, LevelData *levelData, const std::string *levelId) {
 
@@ -105,7 +119,7 @@ TClasslessInstanceHook(int, "?getCooldownTime@EnderpearlItem@@UEBAHXZ") {
 
 THook(int, "?getItemCooldownLeft@Player@@UEBAHW4CooldownType@@@Z", Player* player, CooldownType type) {
     int ret = original(player, type);
-    if (settings.sendEnderPearlCooldownMessage && type == CooldownType::EnderPearl && ret > 0) {
+    if (settings.sendEnderPearlCooldownMessage && (type == CooldownType::EnderPearl) && (ret > 0)) {
 
         const float cooldownSeconds = ret / 20.0f;
         std::stringstream ss;
@@ -207,15 +221,16 @@ TClasslessInstanceHook(void,
 // the bounding box still gets set as 0.8 afterward but I can't find where this number is set
 // however, just modifying the value at the player constructor prevents the bounding box width
 // from showing up as 0.8 clientside for some reason
-THook(void,
+THook(void*,
     "??0Player@@QEAA@AEAVLevel@@AEAVPacketSender@@W4GameType@@AEBVNetworkIdentifier@@EVUUID@mce@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$unique_ptr@VCertificate@@U?$default_delete@VCertificate@@@std@@@8@55@Z",
     Player* player, void *level, void *packetSender, void *playerGameType, void *owner,
     void *subid, void *uuid, void *deviceId, void *certificate, void *platformId, void *platformOnlineId) {
 
-    original(player, level, packetSender, playerGameType, owner, subid, uuid, deviceId, certificate, platformId, platformOnlineId);
+    auto ret = original(player, level, packetSender, playerGameType, owner, subid, uuid, deviceId, certificate, platformId, platformOnlineId);
     const auto& aabb = player->mAABBComponent.mBBDim;
     player->mEntityData.set(ActorDataIDs::BOUNDING_BOX_WIDTH, aabb.x);
     player->mEntityData.set(ActorDataIDs::BOUNDING_BOX_HEIGHT, aabb.y);
+    return ret;
 }
 
 /*THook(void, "?frostWalk@Mob@@QEAAXXZ", Mob *mob) {
