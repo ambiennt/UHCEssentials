@@ -92,6 +92,12 @@ THook(void*, "??0ItemActor@@QEAA@PEAVActorDefinitionGroup@@AEBUActorDefinitionId
     return ret;
 }
 
+THook(void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVPlayerSkinPacket@@@Z",
+    ServerNetworkHandler &snh, NetworkIdentifier const &source, void *pkt) {
+    if (!settings.playersCanChangeSkins) return;
+    original(snh, source, pkt);
+}
+
 THook(bool, "?initialize@Level@@UEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@AEBVLevelSettings@@PEAVLevelData@@PEBV23@@Z",
     Level *level, const std::string *levelName, const LevelSettings *levelSettings, LevelData *levelData, const std::string *levelId) {
 
@@ -151,13 +157,14 @@ THook(void, "?write@AddPlayerPacket@@UEBAXAEAVBinaryStream@@@Z", AddPlayerPacket
 }
 
 // fix crash, idk if its a problem in 1.16.20 though
-THook(void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVPlayerSkinPacket@@@Z",
-    ServerNetworkHandler &snh, NetworkIdentifier &source, void *pkt) {
-    if (!settings.playersCanChangeSkins) return;
+THook(void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVDisconnectPacket@@@Z",
+    ServerNetworkHandler &snh, NetworkIdentifier const &source, void *pkt) {
+    if (!snh.getServerPlayer(source)) return;
     original(snh, source, pkt);
 }
 
 // unlock setmaxplayers command to ignore the 30 player cap
+// yes I just rewrote the whole thing like a BOSS!
 THook(void, "?execute@SetMaxPlayersCommand@@UEBAXAEBVCommandOrigin@@AEAVCommandOutput@@@Z",
     class SetMaxPlayersCommand *cmd, void *origin, CommandOutput &output) {
 
