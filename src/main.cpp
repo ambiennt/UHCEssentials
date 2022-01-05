@@ -170,10 +170,9 @@ THook(void, "?execute@SetMaxPlayersCommand@@UEBAXAEBVCommandOrigin@@AEAVCommandO
 
     auto snh = LocateService<ServerNetworkHandler>();
     const auto empty = mce::UUID::EMPTY;
-    int64_t activePlayers = CallServerClassMethod<int64_t>(
-        "?_getActiveAndInProgressPlayerCount@ServerNetworkHandler@@AEBAHVUUID@mce@@@Z", snh, &empty);
+    int activePlayers = CallServerClassMethod<int>("?_getActiveAndInProgressPlayerCount@ServerNetworkHandler@@AEBAHVUUID@mce@@@Z", snh, &empty);
     int cmdCount = direct_access<int>(cmd, 0x20);
-    int newCount = std::clamp(cmdCount, (int)activePlayers, INT_MAX);
+    int newCount = std::clamp(cmdCount, activePlayers, INT_MAX);
     snh->mMaxNumPlayers = newCount;
     snh->updateServerAnnouncement();
 
@@ -189,7 +188,7 @@ TClasslessInstanceHook(void,
 
     //std::cout << " command: " << *name << "   level: " << (int)requirement << "   f1: " << (int)f1 << "   f2: " << (int)f2 << std::endl;
     //std::cout << "0x" << std::hex << (int64_t)_ReturnAddress() - (int64_t)GetModuleHandle(0) << " - " << *name << std::endl;
-    int64_t address = (int64_t)_ReturnAddress() - (int64_t)GetModuleHandle(0);
+    int64_t address = ((int64_t)_ReturnAddress() - (int64_t)GetModuleHandle(0));
     switch (address) {
         //case 0x475ff3: // gettopsolidblock - gets top solid block in the world (silently fails)
         //case 0x4b5bea: // wsserver - websocket server (doesn't seem to work on BDS)
@@ -240,20 +239,12 @@ THook(void*,
     return ret;
 }
 
-/*THook(void, "?frostWalk@Mob@@QEAAXXZ", Mob *mob) {
-
-    std::cout << "mServerAuthoritativeMovement: " << LocateService<Level>()->mServerAuthoritativeMovement << std::endl;
-    auto boots = mob->getArmor((ArmorSlot) 3);
-    if (boots.mValid) {
-        std::cout << "mValid" << std::endl;
-    }
-    original(mob);
-}*/
-
-/*THook(bool, "?mayPlace@BlockSource@@QEAA_NAEBVBlock@@AEBVBlockPos@@EPEAVActor@@_N@Z",
-    BlockSource *region, const Block *block, const BlockPos *pos, uint8_t face, Actor* placer, bool ignoreEntities) {
-
-    bool ret = original(region, block, pos, face, placer, ignoreEntities);
-    std::cout << "result: " << ret << std::endl;
+// by default, allowNonVanilla only permits mutually exclusive enchants to apply on each other
+// it doesnt account for applying any enchant on any item, regardless of mutual exclusivity
+// so we can redefine how the enchant behavior when allowNonVanilla is set to true 
+TClasslessInstanceHook(EnchantResult*, "?canEnchant@ItemEnchants@@QEAA?AUEnchantResult@@VEnchantmentInstance@@_N@Z",
+    EnchantmentInstance enchant, bool allowNonVanilla) {
+    auto ret = original(this, enchant, allowNonVanilla);
+    if (allowNonVanilla) ret->result = EnchantResultType::Enchant; // force enchant
     return ret;
-}*/
+}

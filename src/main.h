@@ -17,6 +17,8 @@
 #include <Command/CommandOutput.h>
 #include <Item/ItemStack.h>
 #include <Item/Item.h>
+#include <Item/EnchantResult.h>
+#include <Item/EnderPearlItem.h>
 #include <Packet/TextPacket.h>
 #include <Packet/AddPlayerPacket.h>
 #include <Net/ServerNetworkHandler.h>
