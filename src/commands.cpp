@@ -1,31 +1,39 @@
 #include "main.h"
 
-// you can also check for each command by name but its faster to check return address than to compare strings
+// make these commands visible to operators in game and work without cheats
+// setmaxplayers - sets max player count
+// reload - reloads behavior pack functions and DynamicMOTD/SpawnProtection if enabled, respectively
+// permission - lists all the permissions of each player
+// listd - verbose version of /list
+// agent - education edition agent
+
+// lock these commands to permission level 4 only (server console usage)
+// whitelist - adds a player to the whitelist (takes effect if whitelist is enabled, on/off enums don't work)
+// op - promotes a player's permission to "GameMasters" (permission level 1)
+// deop - demotes a player's permission to "Any" (permission level 0)
 TClasslessInstanceHook(void,
 	"?registerCommand@CommandRegistry@@QEAAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PEBDW4CommandPermissionLevel@@UCommandFlag@@3@Z",
-	const std::string *name, const char *description, CommandPermissionLevel requirement, CommandFlagValue f1, CommandFlagValue f2) {
+	const std::string &name, const char *description, CommandPermissionLevel requirement, CommandFlagValue f1, CommandFlagValue f2) {
 
 	//std::cout << " command: " << *name << "   level: " << (int)requirement << "   f1: " << (int)f1 << "   f2: " << (int)f2 << std::endl;
 	//std::cout << "0x" << std::hex << (int64_t)_ReturnAddress() - (int64_t)GetModuleHandle(0) << " - " << *name << std::endl;
-	int64_t address = ((int64_t)_ReturnAddress() - (int64_t)GetModuleHandle(0));
-	switch (address) {
+	//int64_t address = ((int64_t)_ReturnAddress() - (int64_t)GetModuleHandle(0));
 
-		// make these commands visible to operators in game and work without cheats
-		case 0x4975f9: // setmaxplayers - sets max player count
-		case 0x484987: // reload - reloads behavior pack functions and DynamicMOTD/SpawnProtection if enabled, respectively
-		case 0x480e45: // permission - lists all the permissions of each player
-		case 0x47ad28: // listd - verbose version of /list
-		case 0x44ac4d: // agent - education edition agent
-		case 0xaabfe:  // whitelist - adds a player to the whitelist (takes effect if whitelist is enabled, on/off enums don't work)
-			return original(this, name, description, CommandPermissionLevel::GameMasters, CommandFlagValue::None, CommandFlagValue::None);
-
-		// lock these commands to permission level 4 only (server console usage)
-		case 0x47f4a9: // op - promotes a player's permission to "GameMasters" (permission level 1)
-		case 0x468e59: // deop - demotes a player's permission to "Any" (permission level 0)
-			return original(this, name, description, CommandPermissionLevel::Owner, CommandFlagValue::None, CommandFlagValue::None);
-
-		default: break;
+	const char *cName = name.c_str();
+	
+    if ((strcmp(cName, "setmaxplayers") == 0) ||
+    	(strcmp(cName, "reload") == 0) ||
+    	(strcmp(cName, "permission") == 0) ||
+    	(strcmp(cName, "listd") == 0) ||
+    	(strcmp(cName, "agent") == 0) ||
+    	(strcmp(cName, "whitelist") == 0)) {
+  		return original(this, name, description, CommandPermissionLevel::GameMasters, CommandFlagValue::None, CommandFlagValue::None);
 	}
+	else if ((strcmp(cName, "op") == 0) ||
+		(strcmp(cName, "deop") == 0)) {
+  		return original(this, name, description, CommandPermissionLevel::Owner, CommandFlagValue::None, CommandFlagValue::None);
+	}
+
 	original(this, name, description, requirement, f1, f2);
 }
 

@@ -5,21 +5,19 @@ DEFAULT_SETTINGS(settings);
 
 void dllenter() {}
 void dllexit() {}
-void PreInit() {
-	if (!settings.playersCanCrit) {
-		// change jz to jnz
-		GetServerSymbolWithOffset<PatchSpan<2>>(
-			"?attack@Player@@UEAA_NAEAVActor@@@Z", 0x205)->VerifyPatchFunction({0x74, 0x1A}, {0x75, 0x1A}); // 74 1A
+
+void teleportToWithInterpolatedPacket(Player* _this, Vec3 const& pos, bool shouldStopRiding) {
+
+	CallServerClassMethod<void>("?teleportTo@Mob@@UEAAXAEBVVec3@@_NHHAEBUActorUniqueID@@@Z",
+		_this, pos, shouldStopRiding, 0, 1, ActorUniqueID::INVALID_ID);
+
+	MovePlayerPacket teleportPkt(*_this, Player::PositionMode::Normal, 0, 0);
+	_this->sendNetworkPacket(teleportPkt);
+
+	if (_this->hasRider()) {
+		_this->teleportRidersTo(_this->getPos(), 0, 1);
 	}
 }
-void PostInit() {}
-
-// only responsible for sending the animate packet
-// damage bonus will still apply even if this is canceled
-/*TClasslessInstanceHook(void, "?_crit@Player@@UEAAXAEAVActor@@@Z", Actor *actor) {
-	if (!settings.playerCrits && actor->getEntityTypeId() == ActorType::Player_0) return;
-	original(this, actor);
-}*/
 
 TClasslessInstanceHook(bool, "?trySpawnPortal@PortalBlock@@QEBA_NAEAVBlockSource@@AEBVBlockPos@@@Z", void* region, void* pos) {
   	if (!settings.netherPortalIgniting) return false;
@@ -31,7 +29,7 @@ TClasslessInstanceHook(bool, "?use@EndPortalFrameBlock@@UEBA_NAEAVPlayer@@AEBVBl
   	return original(this, player, pos);
 }
 
- // neither of these seem to do anything
+// neither of these seem to do anything
 /*THook(void, "?createPortal@EndPortalFrameBlock@@CAXAEAVBlockSource@@AEBVBlockPos@@@Z", void* region, void* origin) {
 	if (settings.endPortalActivating) return;
 	original(region, origin);
@@ -94,23 +92,17 @@ THook(void*, "??0ItemActor@@QEAA@PEAVActorDefinitionGroup@@AEBUActorDefinitionId
 	return ret;
 }
 
-TClasslessInstanceHook(void, "?handle@ServerNetworkHandler@@UEAAXAEBVNetworkIdentifier@@AEBVPlayerSkinPacket@@@Z",
-	void* source, void* pkt) {
-	if (!settings.playersCanChangeSkins) return;
-	original(this, source, pkt);
-}
-
-THook(bool,
+TInstanceHook(bool,
 	"?initialize@Level@@UEAA_NAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@AEBVLevelSettings@@PEAVLevelData@@PEBV23@@Z",
-	Level *level, void* levelName, void* levelSettings, void* levelData, void* levelId) {
-	bool result = original(level, levelName, levelSettings, levelData, levelId);
-	level->getLevelDataWrapper()->mNetherScale = settings.netherScale;
+	Level, void* levelName, void* levelSettings, void* levelData, void* levelId) {
+	bool result = original(this, levelName, levelSettings, levelData, levelId);
+	this->getLevelDataWrapper()->mNetherScale = settings.netherScale;
 	return result;
 }
 
 // reimplement Player::startCooldown
 // fails to hook?
-/*THook(void, "?startCooldown@Player@@UEAAXPEBVItem@@@Z", Player *player, Item const *item) {
+/*TInstanceHook(void, "?startCooldown@Player@@UEAAXPEBVItem@@@Z", Player, Item const *item) {
 	if (item) {
 		CooldownType type = item->getCooldownType();
 		if (type != CooldownType::None) {
@@ -118,39 +110,38 @@ THook(bool,
 			if (type == CooldownType::EnderPearl) {
 				time = settings.enderPearlCooldownTime;
 			}
-			player->mCooldowns[(int32_t) type] = time;
+			this->mCooldowns[(int32_t)type] = time;
 		}
 	}
 }*/
 
 // reimplement EnderpearlItem::use
-THook(ItemStack*, "?use@EnderpearlItem@@UEBAAEAVItemStack@@AEAV2@AEAVPlayer@@@Z", EnderPearlItem *pearl, ItemStack *stack, Player *player) {
+TClasslessInstanceHook(ItemStack&,
+	"?use@EnderpearlItem@@UEBAAEAVItemStack@@AEAV2@AEAVPlayer@@@Z", ItemStack &stack, Player &player) {
 
-	auto lvl = LocateService<Level>();
-	auto* gr = &lvl->getGameRules();
+	auto& lvl = *player.mLevel;
+	auto& gr = lvl.getGameRules();
 	
-	if (!gr->hasRule(GameRulesIndex::AllowDestructiveObjects) || gr->getBool(GameRulesIndex::AllowDestructiveObjects)) {
+	if (!gr.hasRule(GameRulesIndex::AllowDestructiveObjects) || gr.getGameRuleValue<bool>(GameRulesIndex::AllowDestructiveObjects)) {
 
-		player->useItem(*stack, ItemUseMethod::Throw, true);
-		player->swing();
+		player.useItem(stack, ItemUseMethod::Throw, true);
+		player.swing();
 
-		auto attachPos = player->getAttachPos(ActorLocation::DropAttachPoint, 0.0f);
-		player->playSynchronizedSound(LevelSoundEvent::Throw, attachPos, 0, false);
+		auto attachPos = player.getAttachPos(ActorLocation::Head, 0.f);
+		player.playSynchronizedSound(LevelSoundEvent::Throw, attachPos, -1, false);
 
-		auto spawner = lvl->mMobSpawner.get();
-		ActorDefinitionIdentifier def(ActorType::Enderpearl);
-		CallServerClassMethod<Actor*>(
-			"?spawnProjectile@Spawner@@QEAAPEAVActor@@AEAVBlockSource@@AEBUActorDefinitionIdentifier@@PEAV2@AEBVVec3@@3@Z",
-			spawner, player->mRegion, def, player, player->getPos(), Vec3::ZERO);
+		auto& spawner = *lvl.mMobSpawner.get();
+		spawner.spawnProjectile(*player.mRegion, ActorDefinitionIdentifier(ActorType::Enderpearl),
+			&player, player.getPos(), Vec3::ZERO);
 
 		// inline Player::startCooldown here
-		player->mCooldowns[(int32_t) CooldownType::EnderPearl] = settings.enderPearlCooldownTime;
+		player.mCooldowns[(int32_t)CooldownType::EnderPearl] = settings.enderPearlCooldownTime;
 	}
 	return stack;
 }
 
-THook(int, "?getItemCooldownLeft@Player@@UEBAHW4CooldownType@@@Z", Player* player, CooldownType type) {
-	int ret = original(player, type);
+TInstanceHook(int32_t, "?getItemCooldownLeft@Player@@UEBAHW4CooldownType@@@Z", Player, CooldownType type) {
+	int32_t ret = original(this, type);
 	if (settings.sendEnderPearlCooldownMessage && (type == CooldownType::EnderPearl) && (ret > 0)) {
 
 		const float cooldownSeconds = ret / 20.0f;
@@ -158,7 +149,55 @@ THook(int, "?getItemCooldownLeft@Player@@UEBAHW4CooldownType@@@Z", Player* playe
 		ss << std::setw(0) << cooldownSeconds;
 
 		auto pkt = TextPacket::createTextPacket<TextPacketType::JukeboxPopup>("§6" + ss.str() + "§r");
-		player->sendNetworkPacket(pkt);
+		this->sendNetworkPacket(pkt);
 	}
 	return ret;
+}
+
+TClasslessInstanceHook(void, "?doOnHitEffect@TeleportToSubcomponent@@UEAAXAEAVActor@@AEAVProjectileComponent@@@Z",
+	Actor &projectile, ProjectileComponent &component) {
+
+	auto& lvl = *projectile.mLevel;
+
+	auto shooter = lvl.fetchEntity(component.mOwnerId, false);
+	if (shooter && shooter->hasCategory(ActorCategory::Player)) {
+
+		auto playerShooter = (Player*)shooter;
+		auto target = component.mHitResult.mEntity;
+
+		if (target) {
+			ActorDamageByChildActorSource teleportIntoDmgSource(projectile, *playerShooter, ActorDamageCause::Projectile);
+			target->hurt(teleportIntoDmgSource, 0, true, false);
+		}
+		lvl.broadcastLevelEvent(LevelEvent::ParticlesTeleport, projectile.getPos(), 0, nullptr);
+
+		if (projectile.mDimensionId == playerShooter->mDimensionId) {
+
+			if (playerShooter->isRiding()) {
+				playerShooter->stopRiding(true, true, false);
+			}
+
+			auto posBeforeTeleport = playerShooter->getPos(); // save for later
+
+			// vanilla sends a MovePlayerPacket with the teleport position mode, then in the teleportTo function sends the packet
+			// again unnecessarily. If we teleport the player using Player::PositionMode::Normal, it gives the "interpolated"
+			// teleport effect, and looks a little bit nicer for pvp
+			/*playerShooter->teleportTo(
+				component.mHitResult.mPos, true, 1, (int32_t)projectile.getEntityTypeId(), ActorUniqueID::INVALID_ID);
+			MovePlayerPacket teleportPkt(*playerShooter, Player::PositionMode::Teleport,
+				(int32_t)MovePlayerPacket::TeleportCause::Projectile, (int32_t)projectile.getEntityTypeId());
+			playerShooter->sendNetworkPacket(teleportPkt);*/
+			teleportToWithInterpolatedPacket(playerShooter, component.mHitResult.mPos, true);
+
+			auto& region = *projectile.mRegion;
+			lvl.broadcastDimensionEvent(region, LevelEvent::SoundTeleportEnderPearl, posBeforeTeleport, 0, nullptr);
+			lvl.broadcastDimensionEvent(region, LevelEvent::SoundTeleportEnderPearl, playerShooter->getPos(), 0, nullptr);
+
+			// vanilla actually checks if player has instabuild ability instead of gamemode
+			if (settings.enderPearlFallDamage && !playerShooter->isInCreativeMode()) {
+				ActorDamageSource teleportDmgSource(ActorDamageCause::Fall);
+				playerShooter->hurt(teleportDmgSource, 5, true, false); // idk why knock is true but its what vanilla does
+			}
+		}
+	}
 }

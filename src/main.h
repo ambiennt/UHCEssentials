@@ -11,6 +11,7 @@
 #include <Level/LevelDataWrapper.h>
 #include <Level/GameRules.h>
 #include <Level/GameRulesIndex.h>
+#include <Level/Spawner.h>
 #include <Command/CommandPermissionLevel.h>
 #include <Command/CommandFlag.h>
 #include <Command/CommandOutput.h>
@@ -22,6 +23,8 @@
 #include <Component/ProjectileComponent.h>
 #include <Actor/ItemActor.h>
 #include <Math/Vec3.h>
+#include <Packet/MovePlayerPacket.h>
+//#include <Packet/MoveActorAbsolutePacket.h>
 
 inline struct Settings {
 	bool netherPortalIgniting            = true;
@@ -33,11 +36,10 @@ inline struct Settings {
 	bool lightningDealsDamage            = true;
 	float splashPotionRadius             = 4.0f;
 	bool fireSpreads                     = true;
-	bool playersCanCrit                  = true;
 	uint32_t enderPearlCooldownTime      = 20;
 	bool sendEnderPearlCooldownMessage   = true;
+	bool enderPearlFallDamage            = true;
 	uint32_t netherScale                 = 8;
-	bool playersCanChangeSkins           = true;
 	uint32_t itemActorDespawnTime        = 6000;
 
 	template <typename IO> static inline bool io(IO f, Settings &settings, YAML::Node &node) {
@@ -51,11 +53,10 @@ inline struct Settings {
 			f(settings.lightningDealsDamage, node["lightningDealsDamage"]) &&
 			f(settings.splashPotionRadius, node["splashPotionRadius"]) &&
 			f(settings.fireSpreads, node["fireSpreads"]) &&
-			f(settings.playersCanCrit, node["playersCanCrit"]) &&
 			f(settings.enderPearlCooldownTime, node["enderPearlCooldownTime"]) &&
 			f(settings.sendEnderPearlCooldownMessage, node["sendEnderPearlCooldownMessage"]) &&
+			f(settings.enderPearlFallDamage, node["enderPearlFallDamage"]) &&
 			f(settings.netherScale, node["netherScale"]) &&
-			f(settings.playersCanChangeSkins, node["playersCanChangeSkins"]) &&
 			f(settings.itemActorDespawnTime, node["itemActorDespawnTime"]);
 	}
 } settings;
